@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    .button{
+        margin-right: 15px;
+        padding: 5px 10px;
+        border: 1px solid #eee;
+        color: #eee;
+        cursor: not-allowed;
+    }
+    .open-option {
+        border: 1px solid #000;
+        color: #000;
+        cursor: pointer;
+    }
+    .current-option {
+        border: 1px solid orange;
+        color: orange;
+        cursor: pointer;
+    }
+</style>
+<body>
+    <div id="app">
+        <div>
+            <p>可选组合：</p>
+            <p v-for="(item,index) in haveList" :key="index">
+                <span v-for="(type,idx) in item" style="margin-right:5px;">
+                    {{type}} 
+                </span>
+            </p>
+        </div>
+        <br/>
+        <div v-for="(item,index) in shopField" :key="index">
+            <p>类型：{{item.name}}</p>
+            <span 
+                class="button" 
+                :class="{
+                    'open-option': optional[itemVal],
+                    'current-option': selectVal[item.key] == itemVal
+                }"
+                v-for="(itemVal,indexVal) in item.value" 
+                :key="indexVal"
+                @click="clickBtn(item.key,itemVal,optional[itemVal])"
+            >
+                {{itemVal}}
+            </span>
+        </div>
+    </div>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script>
+    var app = new Vue({
+        el: '#app',
+        data: {
+            // 字段类型
+            shopField: [
+                {
+                    name:'颜色',
+                    key: 'color',
+                    value: ['红','紫'],
+                },
+                {
+                    name:'套餐',
+                    key: 'type',
+                    value: ['套餐1','套餐2'],
+                },
+                {
+                    name:'配置',
+                    key: 'config',
+                    value: ['64G','128G','256G'],
+                },
+                {
+                    name:"购买方式",
+                    key: 'buyWay',
+                    value: ['裸机','赠80元礼包']
+                },
+            ],
+            // 商品存在的组合
+            haveList: [
+                {
+                    color: '紫',
+                    type: '套餐1',
+                    config: '64G',
+                    buyWay: '裸机',
+                },
+                {
+                    color: '紫',
+                    type: '套餐1',
+                    config: '128G',
+                    buyWay: '赠80元礼包',
+                },
+                {
+                    color: '紫',
+                    type: '套餐2',
+                    config: '128G',
+                    buyWay: '裸机',
+                },
+                {
+                    color: '红',
+                    type: '套餐1',
+                    config: '256G',
+                    buyWay: '赠80元礼包',
+                },
+                {
+                    color: '红',
+                    type: '套餐1',
+                    config: '64G',
+                    buyWay: '裸机',
+                },
+            ],  
+            optional: {}, // 当前可选项
+            selectVal: {}, // 当前选择项
+            tableList: [], //最终矩阵
+        },
+        mounted() {
+            this.init();
+        },
+        methods:{
+            // 初始化sku矩阵
+            init(){
+                // 全部字段数组
+                let field = [];
+                for(let i in this.shopField){
+                    field.push(...this.shopField[i].value);
+                    // 初始化当前选择项
+                    this.$set(this.selectVal,this.shopField[i].key,'');
+                }
+                let allList = {};
+                field.map(item => {
+                    allList[item] = [];
+                    // 初始化可选项
+                    this.$set(this.optional,item,true);
+                })
+                console.log(this.optional)
+                // 获取规格可选项
+                for(let i in this.haveList){
+                    for(let j in this.haveList[i]){
+                        allList[this.haveList[i][j]].push(
+                            ...((i,j)=>{
+                                let a = [];
+                                // 填充仓库已有配置
+                                for(let k in this.haveList[i]){
+                                    a.push(this.haveList[i][k])
+                                }
+                                // 可选择同类型
+                                for(let m in this.shopField){
+                                    if(this.shopField[m].key == j) a.push(...this.shopField[m].value)
+                                }
+                                return a
+                            })(i,j)
+                        )
+                    }
+                }
+                // 去重处理
+                for(let i in allList){
+                    allList[i] = Array.from(new Set(allList[i]));
+                }
+                console.log('可选规格',allList)
+                let tableList = {};
+                for(let i in field){
+                    tableList[field[i]] = {}
+                    for(let j in field){
+                        if(allList[field[i]].indexOf(field[j]) > -1){
+                            tableList[field[i]][field[j]] = true;
+                        }else{
+                            tableList[field[i]][field[j]] = false;
+                        }
+                    }
+                }
+                console.log('最终矩阵',tableList);
+                console.table(tableList);
+                this.tableList = tableList;
+            },
+            /**
+             * 选择类型
+             * @param {key} 选择的字段
+             * @param {itemVal} 选择的值
+             * @param {flag} 是否可选
+             */
+            clickBtn(key,itemVal,flag){
+                if(!flag) return
+                if(this.selectVal[key]) { // 当前此类型已选中过
+                    if(this.selectVal[key] == itemVal){ //再次点击已选中的类型，取消选择
+                        this.selectVal[key] = '';
+                    }else { //选择其他同类型
+                        this.selectVal[key] = itemVal;
+                    }
+                    let temp = [];// 存储当前配置项
+                    for(let i in this.selectVal){
+                        if(this.selectVal[i]) temp.push({key: i, val: this.selectVal[i]});
+                        this.selectVal[i] = ''; // 置空
+                    }
+                    for(let i in this.optional){
+                        this.optional[i] = true;
+                    }
+                    // 递归重新选择
+                    if(!temp.length) return
+                    for(let i in temp){
+                        this.clickBtn(temp[i].key, temp[i].val,true);
+                    }
+                } else {
+                    // 当前此类型未选中过，矩阵取交集
+                    this.selectVal[key] = itemVal;
+                    let tempObj = {...this.tableList[itemVal]};
+                    for(let i in tempObj){
+                        this.optional[i] = this.optional[i] && tempObj[i];
+                    }
+                }
+            }
+        }
+    })
+    
+</script>
+</html>
